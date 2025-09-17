@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Ensure we're not importing any audio-related modules
+print("Starting JARVIS CV - Railway optimized version")
+print("Audio features disabled for cloud deployment")
+
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
