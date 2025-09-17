@@ -1,0 +1,15 @@
+faster-whisper
+sounddevice
+numpy
+pyttsx3
+python-dotenv
+requests
+webrtcvad
+gtts
+pygame
+edge-tts
+aiofiles
+elevenlabs
+TTS
+flask
+flask-socketio
