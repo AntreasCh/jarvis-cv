@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Andreas Christodoulou - Interactive CV with Voice</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Interactive CV with AI-powered JARVIS assistant and voice features">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Andreas CV">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: messageSlideIn 0.3s ease-out;
+        }
+
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .jarvis-message {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            color: #333;
+            margin-right: auto;
+            border-left: 4px solid #667eea;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: #667eea;
+        }
+
+        .voice-btn {
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 60px;
+        }
+
+        .voice-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .voice-btn.recording {
+            background: linear-gradient(135deg, #ff4757, #c44569);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .voice-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .voice-toggle {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #2ed573, #1e90ff);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .voice-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(46, 213, 115, 0.4);
+        }
+
+        .voice-toggle.active {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .voice-status {
+            color: white;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status {
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border-radius: 18px;
+            max-width: 80%;
+            margin-right: auto;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            animation: loadingPulse 2s infinite;
+            margin-top: 10px;
+        }
+
+        .loading.show {
+            display: flex;
+            animation: loadingSlideIn 0.3s ease-out, loadingPulse 2s infinite 0.3s;
+        }
+
+        @keyframes loadingPulse {
+            0%, 100% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+            40% {
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.02);
+            }
+        }
+
+        @keyframes loadingSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 0.8;
+                transform: translateY(0);
+            }
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: loading-bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes loading-bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .cv-sections {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+
+        .skill-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .skill-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .skill-tag.clicked {
+            animation: skillClick 0.6s ease-out;
+        }
+
+        @keyframes skillClick {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .project-item {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .project-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .project-item h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .project-item p {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .project-technologies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tech-tag {
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .input-container {
+                flex-direction: column;
+            }
+            
+            .voice-controls {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .message {
+                max-width: 95%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .chat-container {
+                padding: 15px;
+            }
+            
+            .cv-sections {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Andreas Christodoulou</h1>
+            <p>Interactive CV with JARVIS AI Assistant</p>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message jarvis-message">
+                Hello! I'm JARVIS, Andreas's AI assistant. I can tell you about his experience, projects, skills, and education. What would you like to know?
+            </div>
+            <div class="loading" id="loadingIndicator">
+                <div class="loading-dots">
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                </div>
+                <span>JARVIS is thinking...</span>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input type="text" class="input-field" id="messageInput" placeholder="Ask about Andreas's experience, projects, or skills...">
+            <button class="voice-btn" id="voiceBtn" title="Hold to record">🎤</button>
+            <button class="send-btn" id="sendBtn">Send</button>
+        </div>
+
+        <div class="voice-controls">
+            <button class="voice-toggle" id="voiceToggle">🔊 Enable Voice Responses</button>
+            <span class="voice-status" id="voiceStatus">Voice responses disabled</span>
+        </div>
+
+        <div class="status" id="status">Ready to chat</div>
+    </div>
+
+    <!-- CV Sections -->
+    <div class="cv-sections">
+        <div class="section">
+            <h2>Personal Information</h2>
+            <p><strong>Name:</strong> {{ cv_data.personal.name }}</p>
+            <p><strong>Title:</strong> {{ cv_data.personal.title }}</p>
+            <p><strong>Location:</strong> {{ cv_data.personal.location }}</p>
+            <p><strong>Phone:</strong> {{ cv_data.personal.phone }}</p>
+            <p><strong>Email:</strong> {{ cv_data.personal.email }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Summary</h2>
+            <p>{{ cv_data.summary }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Experience</h2>
+            {% for exp in cv_data.experience %}
+            <div class="project-item">
+                <h3>{{ exp.position }} - {{ exp.company }}</h3>
+                <p><strong>Duration:</strong> {{ exp.duration }}</p>
+                <p><strong>Team Size:</strong> {{ exp.team_size }}</p>
+                <p><strong>Culture:</strong> {{ exp.culture }}</p>
+                <h4>Achievements:</h4>
+                <ul>
+                    {% for achievement in exp.achievements %}
+                    <li>{{ achievement }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h2>Skills</h2>
+            <h3>Strengths:</h3>
+            {% for skill in cv_data.skills.strengths %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+            
+            <h3>Languages:</h3>
+            {% for skill in cv_data.skills.languages %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+            
+            <h3>Backend & APIs:</h3>
+            {% for skill in cv_data.skills.backend_apis %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+            
+            <h3>Databases:</h3>
+            {% for skill in cv_data.skills.databases %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+            
+            <h3>Cloud & DevOps:</h3>
+            {% for skill in cv_data.skills.cloud_devops %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+        </div>
+
+        <div class="section">
+            <h2>Education</h2>
+            <div class="project-item">
+                <h3>{{ cv_data.education.degree }}</h3>
+                <p><strong>University:</strong> {{ cv_data.education.university }}</p>
+                <p><strong>Duration:</strong> {{ cv_data.education.duration }}</p>
+                <p><strong>GPA:</strong> {{ cv_data.education.gpa }}</p>
+                <p><strong>Dissertation:</strong> {{ cv_data.education.dissertation }}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Projects</h2>
+            {% for project in cv_data.projects %}
+            <div class="project-item">
+                <h3>{{ project.name }}</h3>
+                <p>{{ project.description }}</p>
+                <div class="project-technologies">
+                    {% for tech in project.technologies %}
+                    <span class="tech-tag">{{ tech }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const voiceToggle = document.getElementById('voiceToggle');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const status = document.getElementById('status');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        let isRecording = false;
+        let voiceEnabled = false;
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // Send message function
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            messageInput.value = '';
+
+            showLoading();
+
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    message: message,
+                    voice_enabled: voiceEnabled 
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.response) {
+                    addMessage(data.response, 'jarvis');
+                    
+                    if (voiceEnabled) {
+                        generateVoiceResponse(data.response);
+                    }
+                } else if (data.error) {
+                    addMessage('Sorry, I encountered an error: ' + data.error, 'jarvis');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                addMessage('Sorry, I encountered an error: ' + error.message, 'jarvis');
+            });
+        }
+
+        // Show loading indicator
+        function showLoading() {
+            chatContainer.appendChild(loadingIndicator);
+            loadingIndicator.classList.add('show');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Hide loading indicator
+        function hideLoading() {
+            loadingIndicator.classList.remove('show');
+        }
+
+        // Generate voice response
+        function generateVoiceResponse(text) {
+            status.textContent = 'Generating voice response...';
+            
+            fetch('/api/voice', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: text })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    status.textContent = 'Voice response ready';
+                    // For now, just show success message
+                    // In production, you'd play the audio
+                } else {
+                    status.textContent = 'Voice generation failed';
+                }
+            })
+            .catch(error => {
+                console.error('Voice generation failed:', error);
+                status.textContent = 'Voice generation failed';
+            });
+        }
+
+        // Add message to chat
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            
+            if (loadingIndicator.parentNode === chatContainer) {
+                chatContainer.insertBefore(messageDiv, loadingIndicator);
+            } else {
+                chatContainer.appendChild(messageDiv);
+            }
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Voice toggle
+        voiceToggle.addEventListener('click', () => {
+            voiceEnabled = !voiceEnabled;
+            if (voiceEnabled) {
+                voiceToggle.textContent = '🔇 Disable Voice Responses';
+                voiceToggle.classList.add('active');
+                voiceStatus.textContent = 'Voice responses enabled';
+            } else {
+                voiceToggle.textContent = '🔊 Enable Voice Responses';
+                voiceToggle.classList.remove('active');
+                voiceStatus.textContent = 'Voice responses disabled';
+            }
+        });
+
+        // Voice recording with real-time audio
+        voiceBtn.addEventListener('mousedown', startRecording);
+        voiceBtn.addEventListener('mouseup', stopRecording);
+        voiceBtn.addEventListener('mouseleave', stopRecording);
+        voiceBtn.addEventListener('touchstart', startRecording);
+        voiceBtn.addEventListener('touchend', stopRecording);
+
+        async function startRecording() {
+            if (isRecording) return;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 16000
+                    } 
+                });
+                
+                isRecording = true;
+                voiceBtn.classList.add('recording');
+                status.textContent = 'Recording... (Release to stop)';
+                
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    processAudioRecording();
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start(100); // Collect data every 100ms
+                
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                status.textContent = 'Microphone access denied. Please allow microphone access.';
+                voiceBtn.classList.remove('recording');
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording || !mediaRecorder) return;
+            
+            isRecording = false;
+            voiceBtn.classList.remove('recording');
+            status.textContent = 'Processing audio...';
+            
+            mediaRecorder.stop();
+        }
+
+        async function processAudioRecording() {
+            if (audioChunks.length === 0) {
+                status.textContent = 'No audio recorded. Try again.';
+                return;
+            }
+            
+            try {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                
+                status.textContent = 'Transcribing audio...';
+                
+                const response = await fetch('/api/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Transcription failed');
+                }
+                
+                const data = await response.json();
+                
+                if (data.transcript && data.transcript.trim()) {
+                    addMessage(data.transcript, 'user');
+                    showLoading();
+                    
+                    const chatResponse = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            message: data.transcript,
+                            voice_enabled: voiceEnabled 
+                        })
+                    });
+                    
+                    const chatData = await chatResponse.json();
+                    hideLoading();
+                    
+                    if (chatData.response) {
+                        addMessage(chatData.response, 'jarvis');
+                        
+                        if (voiceEnabled) {
+                            generateVoiceResponse(chatData.response);
+                        }
+                    }
+                    
+                    status.textContent = 'Ready to chat';
+                } else {
+                    status.textContent = 'No speech detected. Try speaking closer to the microphone.';
+                }
+                
+            } catch (error) {
+                console.error('Error processing audio:', error);
+                status.textContent = 'Error processing audio. Please try again.';
+            }
+        }
+
+        // Interactive Skill Tags
+        document.addEventListener('DOMContentLoaded', () => {
+            const skillTags = document.querySelectorAll('.skill-tag');
+            skillTags.forEach(tag => {
+                tag.addEventListener('click', () => {
+                    tag.classList.add('clicked');
+                    setTimeout(() => {
+                        tag.classList.remove('clicked');
+                    }, 600);
+                    
+                    const skillName = tag.textContent.trim();
+                    const question = `Tell me about Andreas's experience with ${skillName}`;
+                    
+                    addMessage(question, 'user');
+                    showLoading();
+                    
+                    fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            message: question,
+                            voice_enabled: voiceEnabled 
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.response) {
+                            addMessage(data.response, 'jarvis');
+                            
+                            if (voiceEnabled) {
+                                generateVoiceResponse(data.response);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        addMessage('Error asking about ' + skillName, 'jarvis');
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
